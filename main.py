@@ -20,23 +20,22 @@ def get_cpu_temperature():
     return cpu_temp
 
 
-def get_adjusted_temperature(ambient_temp, cpu_temp):
-    adjustment_factor = 0.5
-    adjusted_temp = ambient_temp - ((cpu_temp - ambient_temp) / adjustment_factor)
-    return adjusted_temp
-
-
 def get_sensor_readings():
     # Fetch sensor data
     temperature = sense.get_temperature()
+    temperature_from_humidity = sense.get_temperature_from_humidity()
     pressure = sense.get_pressure()
     humidity = sense.get_humidity()
+    cpu_temp = get_cpu_temperature()
 
     return {
         'temperature': temperature,
+        'temperature_from_humidity': temperature_from_humidity,
         'pressure': pressure,
-        'humidity': humidity
+        'humidity': humidity,
+        'cpu_temp': cpu_temp
     }
+
 
 def insert_readings_to_db(readings):
     try:
@@ -53,16 +52,18 @@ def insert_readings_to_db(readings):
         # Insert the sensor readings into the database
         cursor.execute("""
             INSERT INTO sensor_readings (
-                timestamp, temperature, pressure, humidity
+                timestamp, temperature, temperature_from_humidity, pressure, humidity, cpu_temp
             ) VALUES (
-                %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s
             )
         """, (
-            datetime.now(), readings['temperature'], readings['pressure'], readings['humidity']
+            datetime.now(), readings['temperature'], readings['temperature_from_humidity'], 
+            readings['pressure'], readings['humidity'], readings['cpu_temp']
         ))
 
         # Commit the transaction
         connection.commit()
+
 
     except Exception as error:
         print(f"Error inserting data: {error}")
@@ -72,6 +73,7 @@ def insert_readings_to_db(readings):
             cursor.close()
         if connection:
             connection.close()
+
 
 if __name__ == "__main__":
     while True:
