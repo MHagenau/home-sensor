@@ -13,6 +13,19 @@ DB_PASSWORD = "your_db_password"
 DB_HOST = "your_db_host"
 DB_PORT = "your_db_port"
 
+
+def get_cpu_temperature():
+    with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+        cpu_temp = float(f.read()) / 1000.0
+    return cpu_temp
+
+
+def get_adjusted_temperature(ambient_temp, cpu_temp):
+    adjustment_factor = 0.5
+    adjusted_temp = ambient_temp - ((cpu_temp - ambient_temp) / adjustment_factor)
+    return adjusted_temp
+
+
 def get_sensor_readings():
     # Fetch sensor data
     temperature = sense.get_temperature()
