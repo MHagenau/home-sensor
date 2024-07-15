@@ -1,26 +1,23 @@
 import time
 import psycopg2
+import json
 from sense_hat import SenseHat
-from datetime import datetime
-
-# Initialize SenseHat
-sense = SenseHat()
-
-# Database connection details
-DB_NAME = "your_db_name"
-DB_USER = "your_db_user"
-DB_PASSWORD = "your_db_password"
-DB_HOST = "your_db_host"
-DB_PORT = "your_db_port"
+from datetime import datetime, timezone
 
 
-def get_cpu_temperature():
+# Load database connection details from JSON file
+def load_db_config(file_path: str) -> dict:
+    with open(file_path, 'r') as file:
+        return json.load(file)
+
+
+def get_cpu_temperature() -> float:
     with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
         cpu_temp = float(f.read()) / 1000.0
     return cpu_temp
 
 
-def get_sensor_readings():
+def get_sensor_readings() -> dict:
     # Fetch sensor data
     temperature = sense.get_temperature()
     temperature_from_humidity = sense.get_temperature_from_humidity()
@@ -36,34 +33,32 @@ def get_sensor_readings():
         'cpu_temp': cpu_temp
     }
 
-
-def insert_readings_to_db(readings):
+def insert_readings_to_db(readings, db_config):
     try:
         # Connect to the database
         connection = psycopg2.connect(
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            host=DB_HOST,
-            port=DB_PORT
+            dbname=db_config["DB_NAME"],
+            user=db_config["DB_USER"],
+            password=db_config["DB_PASSWORD"],
+            host=db_config["DB_HOST"],
+            port=db_config["DB_PORT"]
         )
         cursor = connection.cursor()
 
         # Insert the sensor readings into the database
         cursor.execute("""
-            INSERT INTO sensor_readings (
+            INSERT INTO readings.raspberry_readings (
                 timestamp, temperature, temperature_from_humidity, pressure, humidity, cpu_temp
             ) VALUES (
                 %s, %s, %s, %s, %s, %s
             )
         """, (
-            datetime.now(), readings['temperature'], readings['temperature_from_humidity'], 
+            datetime.now(timezone.utc), readings['temperature'], readings['temperature_from_humidity'], 
             readings['pressure'], readings['humidity'], readings['cpu_temp']
         ))
 
         # Commit the transaction
         connection.commit()
-
 
     except Exception as error:
         print(f"Error inserting data: {error}")
@@ -77,6 +72,8 @@ def insert_readings_to_db(readings):
 
 if __name__ == "__main__":
     while True:
+        sense = SenseHat()
         readings = get_sensor_readings()
-        insert_readings_to_db(readings)
+        db_config = load_db_config('secrets.json')
+        insert_readings_to_db(readings, db_config)
         time.sleep(60)
